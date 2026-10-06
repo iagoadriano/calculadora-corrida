@@ -77,6 +77,8 @@ tr:last-child td{border-bottom:0}
 .tag{font-size:12px;color:var(--muted);display:block}
 .empty{color:var(--muted);font-size:14px;text-align:center;padding:10px 0}
 .copy{background:transparent;color:var(--fg);border:1px solid var(--line);padding:11px}
+#painel[hidden]{display:none!important}
+#motSel{font-size:19px;padding:13px 10px}
 .motpick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .motpick button{background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:12px 8px;font-size:16px}
 .motpick button[aria-checked="true"]{background:var(--ink);color:var(--ink-fg);border-color:var(--ink)}
@@ -92,8 +94,13 @@ tr:last-child td{border-bottom:0}
 
   <fieldset class="mot">
     <legend>Motorista</legend>
-    <div class="motpick" role="radiogroup" aria-label="Motorista do lançamento" id="motPick"></div>
+    <label for="motSel">Quem está lançando
+      <select id="motSel"><option value="">Selecione o motorista…</option></select>
+    </label>
+    <span class="hint" id="motAviso">Escolha o motorista para abrir a calculadora e os relatórios dele.</span>
   </fieldset>
+
+  <div id="painel" hidden style="display:grid;gap:16px">
 
   <section class="result" aria-live="polite">
     <span class="lbl">Você recebe de fato</span>
@@ -113,12 +120,12 @@ tr:last-child td{border-bottom:0}
           <option>Maxim</option><option>Avulsa</option><option>Uber</option><option>99</option><option>inDrive</option>
         </select>
       </label>
-      <label for="valor">Valor da corrida (R$)<input id="valor" type="number" inputmode="decimal" step="0.01" value="18.50"></label>
+      <label for="valor">Valor da corrida (R$)<input id="valor" type="number" inputmode="decimal" step="0.01" value="" placeholder="0,00"></label>
       <label for="taxa">Taxa do app (%)<input id="taxa" type="number" inputmode="decimal" step="0.5" value="17"></label>
-      <label for="minutos">Tempo total (min)<input id="minutos" type="number" inputmode="numeric" step="1" value="20"></label>
-      <label for="kmBusca">Km até o passageiro<input id="kmBusca" type="number" inputmode="decimal" step="0.1" value="2"></label>
-      <label for="kmCorrida">Km da corrida<input id="kmCorrida" type="number" inputmode="decimal" step="0.1" value="6"></label>
-      <label for="outras">Outras taxas (R$)<input id="outras" type="number" inputmode="decimal" step="0.01" value="0"></label>
+      <label for="minutos">Tempo total (min)<input id="minutos" type="number" inputmode="numeric" step="1" value="" placeholder="0"></label>
+      <label for="kmBusca">Km até o passageiro<input id="kmBusca" type="number" inputmode="decimal" step="0.1" value="" placeholder="0"></label>
+      <label for="kmCorrida">Km da corrida<input id="kmCorrida" type="number" inputmode="decimal" step="0.1" value="" placeholder="0"></label>
+      <label for="outras">Outras taxas (R$)<input id="outras" type="number" inputmode="decimal" step="0.01" value="" placeholder="0,00"></label>
       <label for="outrasDesc">Descrição<input id="outrasDesc" type="text" placeholder="pedágio, estacionamento…" style="font-size:16px"></label>
     </div>
     <div class="save">
@@ -183,6 +190,7 @@ tr:last-child td{border-bottom:0}
       <label class="copy" for="importar" style="text-align:center;cursor:pointer;color:var(--fg);font-size:16px;font-weight:600;border-radius:10px">Importar CSV<input type="file" id="importar" accept=".csv,text/csv" hidden></label>
     </div>
   </section>
+  </div>
 </main>
 
 <script>
@@ -203,19 +211,25 @@ const PADRAO={consumo:"7.5",preco:"6.61",meta:"1.50",taxaMaxim:"17"};
 let cfg={mot:MOTORISTAS[0],filtro:"",carros:{}};
 try{const s=JSON.parse(localStorage.getItem("calc-corrida-v2")||"null");if(s)cfg=Object.assign(cfg,s);
   else{const v1=JSON.parse(localStorage.getItem("calc-corrida")||"null");if(v1)cfg.carros[MOTORISTAS[0]]=v1}}catch(e){}
-if(!MOTORISTAS.includes(cfg.mot))cfg.mot=MOTORISTAS[0];
-function carregarCarro(){const c=Object.assign({},PADRAO,cfg.carros[cfg.mot]||{});PREFS.forEach(k=>$(k).value=c[k]);$("motCarro").textContent=cfg.mot}
-function savePrefs(){const o={};PREFS.forEach(k=>o[k]=$(k).value);cfg.carros[cfg.mot]=o;try{localStorage.setItem("calc-corrida-v2",JSON.stringify(cfg))}catch(e){}}
-function desenharMotoristas(){
-  $("motPick").innerHTML=MOTORISTAS.map(m=>`<button type="button" role="radio" aria-checked="${m===cfg.mot}" data-mot="${esc(m)}">${esc(m)}</button>`).join("");
-}
-$("motPick").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;cfg.mot=b.dataset.mot;desenharMotoristas();carregarCarro();
-  if($("plataforma").value==="Maxim")$("taxa").value=$("taxaMaxim").value;calc()});
+cfg.mot="";   // sempre começa sem motorista escolhido
+function carregarCarro(){if(!cfg.mot)return;const c=Object.assign({},PADRAO,cfg.carros[cfg.mot]||{});PREFS.forEach(k=>$(k).value=c[k]);$("motCarro").textContent=cfg.mot}
+function savePrefs(){if(!cfg.mot)return;const o={};PREFS.forEach(k=>o[k]=$(k).value);cfg.carros[cfg.mot]=o;try{localStorage.setItem("calc-corrida-v2",JSON.stringify(cfg))}catch(e){}}
+$("motSel").innerHTML+=MOTORISTAS.map(m=>`<option>${esc(m)}</option>`).join("");
+$("motSel").value="";
+function limparCorrida(){["valor","kmBusca","kmCorrida","minutos","outras","outrasDesc"].forEach(id=>$(id).value="");$("plataforma").value="Maxim";status("")}
+$("motSel").addEventListener("change",()=>{
+  cfg.mot=$("motSel").value;
+  limparCorrida();
+  if(!cfg.mot){$("painel").hidden=true;$("motAviso").hidden=false;return}
+  carregarCarro();$("taxa").value=$("taxaMaxim").value;
+  $("filtroMot").value=cfg.mot;cfg.filtro=cfg.mot;
+  modo="dia";ref=new Date();document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.mode==="dia"));
+  $("motAviso").hidden=true;$("painel").hidden=false;calc();render();
+});
 $("filtroMot").innerHTML+=MOTORISTAS.map(m=>`<option>${esc(m)}</option>`).join("");
-$("filtroMot").value=MOTORISTAS.includes(cfg.filtro)?cfg.filtro:"";
+$("filtroMot").value="";
 $("filtroMot").addEventListener("change",()=>{cfg.filtro=$("filtroMot").value;savePrefs();render()});
-desenharMotoristas();carregarCarro();
-$("taxa").value=$("taxaMaxim").value;
+
 
 /* ---------- calculadora ---------- */
 function corridaAtual(){
@@ -339,6 +353,7 @@ carregar();render();
 
 $("registrar").addEventListener("click",()=>{
   const c=corridaAtual();
+  if(!cfg.mot){status("Escolha o motorista primeiro.","err");return}
   if(c.valor<=0){status("Coloque o valor da corrida antes de registrar.","err");return}
   const agora=new Date();
   const doc={id:"c"+agora.getTime().toString(36)+Math.random().toString(36).slice(2,6),ts:agora.getTime(),dia:ymd(agora),

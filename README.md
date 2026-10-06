@@ -12,7 +12,7 @@ Funciona direto no navegador do celular (Safari ou Chrome), sem login e sem serv
 
 1. Abra o `index.html` no navegador, ou o link do GitHub Pages (veja abaixo).
 2. Em **Carro**, configure o consumo (km/l), o preço do litro, a taxa da Maxim e a sua meta mínima de R$/km.
-3. No topo, toque no nome do motorista. Para cada corrida, escolha a origem, preencha o valor, os km (até o passageiro + da corrida), o tempo e as outras taxas, se houver.
+3. No topo, selecione o motorista na lista. A tela abre zerada e só mostra a calculadora e os relatórios depois dessa escolha. Para cada corrida, escolha a origem, preencha o valor, os km (até o passageiro + da corrida), o tempo e as outras taxas, se houver.
    Toque em **Registrar corrida**.
 4. Em **Relatório**, alterne entre Dia / Semana / Mês e use as setas ‹ › para mudar o período.
    **Copiar resumo** copia o texto do relatório para você colar no WhatsApp.
