@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Calculadora de Corrida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: uma coluna estreita; calculadora em cima, botão de registrar, e o relatório (dia/semana/mês) embaixo, como um painel de bordo */
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --fg:#1b2230; --muted:#5d6878; --line:#d5dae2;
+  --accent:#e0a100; --accent-ink:#1b2230; --ink:#1b2230; --ink-fg:#ffffff; --good:#1f8a4c; --bad:#c23b2b;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --surface:#1b212b; --fg:#e8ebf0; --muted:#97a1b0; --line:#2c3441;
+  --accent:#f2b51d; --accent-ink:#12161d; --ink:#e8ebf0; --ink-fg:#12161d; --good:#4cc47f; --bad:#ff7a66; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --surface:#1b212b; --fg:#e8ebf0; --muted:#97a1b0; --line:#2c3441;
+  --accent:#f2b51d; --accent-ink:#12161d; --ink:#e8ebf0; --ink-fg:#12161d; --good:#4cc47f; --bad:#ff7a66; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;padding-inline:16px;padding-block:20px 40px}
+main{max-width:460px;margin:0 auto;display:grid;gap:16px}
+h1,h2{font-family:var(--display);font-weight:700;margin:0;text-wrap:balance}
+h1{font-size:30px}
+h2{font-size:24px}
+.sub{color:var(--muted);font-size:14px;margin:2px 0 0}
+.result{background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:16px 18px;display:grid;gap:6px}
+.lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.big{font-family:var(--display);font-weight:700;font-size:52px;line-height:1;font-variant-numeric:tabular-nums}
+.result .row{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;font-weight:500;font-variant-numeric:tabular-nums}
+.verdict{font-weight:600;font-size:14px}
+fieldset{border:1px solid var(--line);background:var(--surface);border-radius:12px;margin:0;padding:14px;display:grid;gap:12px;min-width:0}
+legend{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding:0 4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500;min-width:0}
+input,select{font:600 20px var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%;font-variant-numeric:tabular-nums}
+select{font-size:17px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{font-size:12px;color:var(--muted)}
+.save{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+button{font:600 16px var(--body);cursor:pointer;border-radius:10px;border:0}
+.primary{background:var(--ink);color:var(--ink-fg);padding:13px 18px}
+.primary:disabled{opacity:.5;cursor:default}
+.status{font-size:13px;color:var(--muted);min-height:1em}
+.status.ok{color:var(--good)}
+.status.err{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:15px}
+td,th{padding:7px 0;border-bottom:1px solid var(--line);text-align:left}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+td.n,th.n{text-align:right}
+tr:last-child td{border-bottom:0}
+.neg{color:var(--bad)}
+.pos{color:var(--good)}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.tabs button{background:transparent;color:var(--muted);padding:9px 0}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--ink-fg)}
+.period{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.period button{background:var(--surface);color:var(--fg);border:1px solid var(--line);width:42px;height:42px;font-size:20px}
+.period strong{font-family:var(--display);font-size:22px;text-align:center}
+.report{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:14px}
+.report .big{font-size:44px;color:var(--fg)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi{display:grid;gap:2px;min-width:0}
+.kpi span{font-size:12px;color:var(--muted)}
+.kpi b{font-size:17px;font-variant-numeric:tabular-nums}
+.bar{height:10px;border-radius:5px;display:flex;overflow:hidden;background:var(--line)}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:var(--c)}
+.tablewrap{overflow-x:auto}
+.del{background:transparent;color:var(--muted);padding:4px 8px;font-size:13px;border:1px solid var(--line);border-radius:6px}
+.del.armed{color:var(--bad);border-color:var(--bad)}
+.tag{font-size:12px;color:var(--muted);display:block}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:10px 0}
+.copy{background:transparent;color:var(--fg);border:1px solid var(--line);padding:11px}
+@media (max-width:360px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Calculadora de Corrida</h1>
+    <p class="sub">Quanto sobra no bolso depois da taxa e do combustível</p>
+  </header>
+
+  <section class="result" aria-live="polite">
+    <span class="lbl">Você recebe de fato</span>
+    <span class="big" id="liquido">R$ 0,00</span>
+    <div class="row">
+      <span id="porKm">R$ 0,00/km</span>
+      <span id="porHora"></span>
+    </div>
+    <span class="verdict" id="verdict"></span>
+  </section>
+
+  <fieldset>
+    <legend>Corrida</legend>
+    <div class="grid">
+      <label for="plataforma">Origem
+        <select id="plataforma">
+          <option>Maxim</option><option>Avulsa</option><option>Uber</option><option>99</option><option>inDrive</option>
+        </select>
+      </label>
+      <label for="valor">Valor da corrida (R$)<input id="valor" type="number" inputmode="decimal" step="0.01" value="18.50"></label>
+      <label for="taxa">Taxa do app (%)<input id="taxa" type="number" inputmode="decimal" step="0.5" value="17"></label>
+      <label for="minutos">Tempo total (min)<input id="minutos" type="number" inputmode="numeric" step="1" value="20"></label>
+      <label for="kmBusca">Km até o passageiro<input id="kmBusca" type="number" inputmode="decimal" step="0.1" value="2"></label>
+      <label for="kmCorrida">Km da corrida<input id="kmCorrida" type="number" inputmode="decimal" step="0.1" value="6"></label>
+      <label for="outras">Outras taxas (R$)<input id="outras" type="number" inputmode="decimal" step="0.01" value="0"></label>
+      <label for="outrasDesc">Descrição<input id="outrasDesc" type="text" placeholder="pedágio, estacionamento…" style="font-size:16px"></label>
+    </div>
+    <div class="save">
+      <span class="status" id="status"></span>
+      <button class="primary" id="registrar" type="button">Registrar corrida</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Carro</legend>
+    <div class="grid">
+      <label for="consumo">Consumo (km/l)<input id="consumo" type="number" inputmode="decimal" step="0.1" value="7.5"></label>
+      <label for="preco">Combustível (R$/l)<input id="preco" type="number" inputmode="decimal" step="0.01" value="6.61"></label>
+      <label for="meta">Meta mínima (R$/km)<input id="meta" type="number" inputmode="decimal" step="0.1" value="1.50"></label>
+      <label for="taxaMaxim">Taxa Maxim (%)<input id="taxaMaxim" type="number" inputmode="decimal" step="0.5" value="17"></label>
+    </div>
+    <span class="hint">Creta 2.0, média de 7,5 km/l. Atualize o preço do litro quando abastecer. Cada corrida registrada guarda o preço do dia.</span>
+  </fieldset>
+
+  <section style="display:grid;gap:12px" aria-labelledby="relTitulo">
+    <h2 id="relTitulo">Relatório</h2>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-mode="dia" aria-selected="true">Dia</button>
+      <button type="button" role="tab" data-mode="semana" aria-selected="false">Semana</button>
+      <button type="button" role="tab" data-mode="mes" aria-selected="false">Mês</button>
+    </div>
+    <div class="period">
+      <button type="button" id="prev" aria-label="Período anterior">‹</button>
+      <strong id="periodo"></strong>
+      <button type="button" id="next" aria-label="Próximo período">›</button>
+    </div>
+    <div class="report" id="report">
+      <div style="display:grid;gap:4px">
+        <span class="lbl" style="color:var(--muted)">Líquido no período</span>
+        <span class="big" id="rLiq">R$ 0,00</span>
+      </div>
+      <div class="bar" id="rBar" aria-hidden="true"></div>
+      <div class="legend">
+        <span style="--c:var(--good)">Líquido</span>
+        <span style="--c:var(--accent)">Combustível</span>
+        <span style="--c:var(--bad)">Taxa do app</span>
+        <span style="--c:var(--muted)">Outras taxas</span>
+      </div>
+      <div class="kpis" id="rKpis"></div>
+      <div class="tablewrap" id="rTable"></div>
+      <button class="copy" type="button" id="copiar">Copiar resumo</button>
+    </div>
+  </section>
+
+  <section class="report" aria-labelledby="bkTitulo">
+    <h2 id="bkTitulo">Backup</h2>
+    <p class="hint" style="margin:0">As corridas ficam salvas neste navegador. Exporte o CSV com frequência e guarde na pasta <b>backup</b>. Para recuperar ou passar para outro aparelho, importe o arquivo.</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:14px">
+      <label style="display:flex;gap:6px;align-items:center;color:var(--fg)" for="expTudo"><input type="radio" name="exp" id="expTudo" value="tudo" checked style="width:auto">Histórico completo</label>
+      <label style="display:flex;gap:6px;align-items:center;color:var(--fg)" for="expPer"><input type="radio" name="exp" id="expPer" value="periodo" style="width:auto">Só o período aberto</label>
+    </div>
+    <div class="grid">
+      <button class="primary" type="button" id="exportar">Exportar CSV</button>
+      <label class="copy" for="importar" style="text-align:center;cursor:pointer;color:var(--fg);font-size:16px;font-weight:600;border-radius:10px">Importar CSV<input type="file" id="importar" accept=".csv,text/csv" hidden></label>
+    </div>
+  </section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const brl=n=>(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const n1=n=>(n||0).toLocaleString("pt-BR",{maximumFractionDigits:1});
+const num=id=>{const v=parseFloat($(id).value);return isFinite(v)?v:0};
+const esc=s=>String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const DIAS=["dom","seg","ter","qua","qui","sex","sáb"];
+
+/* ---------- preferências do aparelho ---------- */
+const PREFS=["consumo","preco","meta","taxaMaxim"];
+try{const s=JSON.parse(localStorage.getItem("calc-corrida")||"{}");PREFS.forEach(k=>{if(s[k]!=null&&s[k]!=="")$(k).value=s[k]})}catch(e){}
+function savePrefs(){try{const o={};PREFS.forEach(k=>o[k]=$(k).value);localStorage.setItem("calc-corrida",JSON.stringify(o))}catch(e){}}
+
+/* ---------- calculadora ---------- */
+function corridaAtual(){
+  const valor=num("valor"),taxaPct=num("taxa"),km=num("kmBusca")+num("kmCorrida");
+  const consumo=num("consumo"),preco=num("preco"),minutos=num("minutos");
+  const taxa=valor*taxaPct/100;
+  const combustivel=consumo>0?km/consumo*preco:0;
+  const outras=num("outras");
+  return {valor,taxaPct,taxa,km,minutos,combustivel,outras,liquido:valor-taxa-combustivel-outras,preco,consumo};
+}
+function calc(){
+  const c=corridaAtual(),meta=num("meta");
+  const porKm=c.km>0?c.liquido/c.km:0;
+  $("liquido").textContent=brl(c.liquido);
+  $("porKm").textContent=brl(porKm)+"/km rodado";
+  $("porHora").textContent=c.minutos>0?brl(c.liquido/c.minutos*60)+"/hora":"";
+  $("verdict").textContent=c.km>0?(porKm>=meta?"✓ Acima da sua meta, vale aceitar":"✗ Abaixo da sua meta de "+brl(meta)+"/km"):"";
+  savePrefs();
+}
+["valor","taxa","kmBusca","kmCorrida","minutos","outras","consumo","preco","meta","taxaMaxim"].forEach(id=>$(id).addEventListener("input",calc));
+$("plataforma").addEventListener("change",()=>{
+  const p=$("plataforma").value;
+  $("taxa").value=p==="Avulsa"?0:p==="Maxim"?$("taxaMaxim").value:$("taxa").value;
+  calc();
+});
+calc();
+
+/* ---------- relatório ---------- */
+let corridas=[];      // corridas salvas no navegador
+let modo="dia";
+let ref=new Date();   // data de referência do período
+
+function intervalo(){
+  const d=new Date(ref.getFullYear(),ref.getMonth(),ref.getDate());
+  if(modo==="dia") return {ini:d,fim:new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)};
+  if(modo==="semana"){const dow=(d.getDay()+6)%7;const ini=new Date(d.getFullYear(),d.getMonth(),d.getDate()-dow);return {ini,fim:new Date(ini.getFullYear(),ini.getMonth(),ini.getDate()+7)}}
+  const ini=new Date(d.getFullYear(),d.getMonth(),1);return {ini,fim:new Date(d.getFullYear(),d.getMonth()+1,1)};
+}
+function rotulo(){
+  const {ini,fim}=intervalo();
+  if(modo==="dia"){const hoje=ymd(new Date());const s=ymd(ini)===hoje?"Hoje, ":"";return s+DIAS[ini.getDay()]+" "+pad(ini.getDate())+"/"+pad(ini.getMonth()+1)}
+  if(modo==="semana"){const f=new Date(fim-864e5);return pad(ini.getDate())+"/"+pad(ini.getMonth()+1)+" a "+pad(f.getDate())+"/"+pad(f.getMonth()+1)}
+  return MESES[ini.getMonth()]+" "+ini.getFullYear();
+}
+function soma(lista){
+  const t={n:lista.length,valor:0,taxa:0,outras:0,combustivel:0,liquido:0,km:0,min:0,liqMin:0};
+  lista.forEach(c=>{t.valor+=c.valor;t.taxa+=c.taxa;t.outras+=c.outras||0;t.combustivel+=c.combustivel;t.liquido+=c.liquido;t.km+=c.km;if(c.minutos>0){t.min+=c.minutos;t.liqMin+=c.liquido}});
+  return t;
+}
+function noPeriodo(){
+  const {ini,fim}=intervalo();const a=ymd(ini),b=ymd(new Date(fim-864e5));
+  return corridas.filter(c=>c.dia>=a&&c.dia<=b).sort((x,y)=>x.ts-y.ts);
+}
+function render(){
+  $("periodo").textContent=rotulo();
+  const lista=noPeriodo(),t=soma(lista);
+  $("rLiq").textContent=brl(t.liquido);
+  const tot=t.valor||1;
+  $("rBar").innerHTML=t.valor>0?`<i style="width:${Math.max(0,t.liquido)/tot*100}%;background:var(--good)"></i><i style="width:${t.combustivel/tot*100}%;background:var(--accent)"></i><i style="width:${t.taxa/tot*100}%;background:var(--bad)"></i><i style="width:${t.outras/tot*100}%;background:var(--muted)"></i>`:"";
+  const kpis=[
+    ["Corridas",String(t.n)],["Faturado",brl(t.valor)],["Km rodados",n1(t.km)],
+    ["Combustível",brl(t.combustivel)],["Taxa do app",brl(t.taxa)],["Outras taxas",brl(t.outras)],
+    ["R$ por km",t.km>0?brl(t.liquido/t.km):"—"],
+  ];
+  if(t.min>0) kpis.push(["R$ por hora",brl(t.liqMin/t.min*60)]);
+  if(modo!=="dia"){const dias=new Set(lista.map(c=>c.dia)).size;kpis.push(["Dias rodados",String(dias)]);if(dias)kpis.push(["Média por dia",brl(t.liquido/dias)])}
+  $("rKpis").innerHTML=kpis.map(([k,v])=>`<div class="kpi"><span>${k}</span><b>${v}</b></div>`).join("");
+
+  const box=$("rTable");
+  if(!lista.length){box.innerHTML=`<p class="empty">${dbState==="off"?"Este navegador está bloqueando o armazenamento. Saia do modo privado.":"Nenhuma corrida registrada neste período."}</p>`;return}
+  if(modo==="dia"){
+    box.innerHTML=`<table><tr><th>Corrida</th><th class="n">Valor</th><th class="n">Líquido</th><th class="n">R$/km</th><th></th></tr>`+
+      lista.map(c=>`<tr><td>${c.hora||"—"}<span class="tag">${c.plataforma} · ${n1(c.km)} km${c.outras?` · ${esc(c.outrasDesc||"outras")} ${brl(c.outras)}`:""}</span></td><td class="n">${brl(c.valor)}</td><td class="n ${c.liquido>=0?"pos":"neg"}">${brl(c.liquido)}</td><td class="n">${c.km>0?brl(c.liquido/c.km):"—"}</td><td class="n">${podeEscrever?`<button class="del" data-id="${c.id}" type="button" aria-label="Apagar corrida">✕</button>`:""}</td></tr>`).join("")+`</table>`;
+  }else{
+    const porDia={};lista.forEach(c=>(porDia[c.dia]=porDia[c.dia]||[]).push(c));
+    const porOrigem={};lista.forEach(c=>(porOrigem[c.plataforma]=porOrigem[c.plataforma]||[]).push(c));
+    box.innerHTML=`<table><tr><th>Dia</th><th class="n">Corridas</th><th class="n">Faturado</th><th class="n">Líquido</th></tr>`+
+      Object.keys(porDia).sort().map(d=>{const s=soma(porDia[d]);const dt=new Date(d+"T12:00");return `<tr><td>${DIAS[dt.getDay()]} ${pad(dt.getDate())}/${pad(dt.getMonth()+1)}</td><td class="n">${s.n}</td><td class="n">${brl(s.valor)}</td><td class="n ${s.liquido>=0?"pos":"neg"}">${brl(s.liquido)}</td></tr>`}).join("")+`</table>`+
+      `<table style="margin-top:12px"><tr><th>Origem</th><th class="n">Corridas</th><th class="n">Líquido</th><th class="n">R$/km</th></tr>`+
+      Object.keys(porOrigem).map(o=>{const s=soma(porOrigem[o]);return `<tr><td>${o}</td><td class="n">${s.n}</td><td class="n">${brl(s.liquido)}</td><td class="n">${s.km>0?brl(s.liquido/s.km):"—"}</td></tr>`}).join("")+`</table>`;
+  }
+}
+document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{
+  modo=b.dataset.mode;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));render();
+}));
+function mover(dir){
+  if(modo==="dia") ref=new Date(ref.getFullYear(),ref.getMonth(),ref.getDate()+dir);
+  else if(modo==="semana") ref=new Date(ref.getFullYear(),ref.getMonth(),ref.getDate()+7*dir);
+  else ref=new Date(ref.getFullYear(),ref.getMonth()+dir,1);
+  render();
+}
+$("prev").addEventListener("click",()=>mover(-1));
+$("next").addEventListener("click",()=>mover(1));
+
+$("copiar").addEventListener("click",async()=>{
+  const lista=noPeriodo(),t=soma(lista);
+  const txt=[`Relatório ${modo==="mes"?"do mês":modo==="semana"?"da semana":"do dia"}: ${rotulo()}`,
+    `Corridas: ${t.n}`,`Faturado: ${brl(t.valor)}`,`Taxa do app: ${brl(t.taxa)}`,`Outras taxas: ${brl(t.outras)}`,`Combustível: ${brl(t.combustivel)}`,
+    `Líquido: ${brl(t.liquido)}`,`Km rodados: ${n1(t.km)}`,`R$/km: ${t.km>0?brl(t.liquido/t.km):"—"}`].join("\n");
+  try{await navigator.clipboard.writeText(txt);$("copiar").textContent="Resumo copiado"}
+  catch(e){$("copiar").textContent="Não deu para copiar"}
+  setTimeout(()=>$("copiar").textContent="Copiar resumo",2000);
+});
+
+/* ---------- armazenamento no navegador + CSV ---------- */
+const KEY="corridas-v1";
+let dbState="on",podeEscrever=true;
+function status(msg,cls){const s=$("status");s.textContent=msg;s.className="status "+(cls||"")}
+function carregar(){try{corridas=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){corridas=[];dbState="off"}}
+function gravar(){try{localStorage.setItem(KEY,JSON.stringify(corridas));return true}catch(e){status("O navegador não deixou salvar. Exporte o CSV para não perder.","err");return false}}
+carregar();render();
+
+$("registrar").addEventListener("click",()=>{
+  const c=corridaAtual();
+  if(c.valor<=0){status("Coloque o valor da corrida antes de registrar.","err");return}
+  const agora=new Date();
+  const doc={id:"c"+agora.getTime().toString(36)+Math.random().toString(36).slice(2,6),ts:agora.getTime(),dia:ymd(agora),
+    hora:pad(agora.getHours())+":"+pad(agora.getMinutes()),plataforma:$("plataforma").value,valor:+c.valor.toFixed(2),
+    taxaPct:c.taxaPct,taxa:+c.taxa.toFixed(2),km:+c.km.toFixed(1),minutos:c.minutos,precoLitro:c.preco,consumo:c.consumo,
+    combustivel:+c.combustivel.toFixed(2),outras:+c.outras.toFixed(2),outrasDesc:$("outrasDesc").value.trim().slice(0,60),
+    liquido:+c.liquido.toFixed(2)};
+  corridas.push(doc);
+  if(gravar()){
+    status("Corrida de "+brl(doc.valor)+" registrada.","ok");
+    $("outras").value=0;$("outrasDesc").value="";calc();
+    modo="dia";ref=new Date();document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.mode==="dia"));
+  }
+  render();
+});
+
+$("rTable").addEventListener("click",e=>{
+  const b=e.target.closest(".del");if(!b) return;
+  if(!b.classList.contains("armed")){b.classList.add("armed");b.textContent="Apagar?";setTimeout(()=>{if(b.isConnected){b.classList.remove("armed");b.textContent="✕"}},3000);return}
+  corridas=corridas.filter(c=>c.id!==b.dataset.id);gravar();status("Corrida apagada.","ok");render();
+});
+
+/* CSV: separador ";" e vírgula decimal, abre certo no Excel em português */
+const COLS=[["id","id"],["data","dia"],["hora","hora"],["origem","plataforma"],["valor","valor"],["taxa_pct","taxaPct"],["taxa_app","taxa"],
+  ["outras_taxas","outras"],["outras_desc","outrasDesc"],["km","km"],["minutos","minutos"],["preco_litro","precoLitro"],
+  ["consumo_km_l","consumo"],["combustivel","combustivel"],["liquido","liquido"],["timestamp","ts"]];
+const NUM=new Set(["valor","taxaPct","taxa","outras","km","minutos","precoLitro","consumo","combustivel","liquido","ts"]);
+function celula(v,k){if(NUM.has(k))return String(v??0).replace(".",",");const t=String(v??"");return /[;"\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t}
+function paraCSV(lista){return "﻿"+COLS.map(c=>c[0]).join(";")+"\n"+lista.map(c=>COLS.map(([,k])=>celula(c[k],k)).join(";")).join("\n")+"\n"}
+function lerCSV(txt){
+  txt=txt.replace(/^﻿/,"");const linhas=[];let row=[],cel="",q=false;
+  for(let i=0;i<txt.length;i++){const ch=txt[i];
+    if(q){if(ch==='"'){if(txt[i+1]==='"'){cel+='"';i++}else q=false}else cel+=ch}
+    else if(ch==='"')q=true;else if(ch===";"){row.push(cel);cel=""}else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&txt[i+1]==="\n")i++;row.push(cel);cel="";if(row.some(x=>x!==""))linhas.push(row);row=[]}else cel+=ch}
+  if(cel!==""||row.length){row.push(cel);linhas.push(row)}
+  const cab=linhas.shift()||[];const idx=Object.fromEntries(COLS.map(([n,k])=>[k,cab.indexOf(n)]));
+  if(idx.dia<0||idx.valor<0) throw new Error("formato");
+  return linhas.map(r=>{const o={};COLS.forEach(([,k])=>{const v=idx[k]>=0?r[idx[k]]:"";o[k]=NUM.has(k)?(parseFloat(String(v).replace(",","."))||0):(v||"")});
+    if(!o.ts)o.ts=new Date(o.dia+"T"+(o.hora||"12:00")).getTime();if(!o.id)o.id="c"+o.ts.toString(36)+Math.random().toString(36).slice(2,6);return o});
+}
+$("exportar").addEventListener("click",()=>{
+  const lista=modoExport()==="tudo"?corridas.slice().sort((a,b)=>a.ts-b.ts):noPeriodo();
+  if(!lista.length){status("Não há corridas para exportar.","err");return}
+  const nome="corridas-"+(modoExport()==="tudo"?"completo-"+ymd(new Date()):rotulo().replace(/[^0-9a-zà-ú]+/gi,"-"))+".csv";
+  const url=URL.createObjectURL(new Blob([paraCSV(lista)],{type:"text/csv;charset=utf-8"}));
+  const a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  status("Arquivo "+nome+" gerado. Guarde na pasta backup.","ok");
+});
+function modoExport(){return document.querySelector('input[name="exp"]:checked').value}
+$("importar").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f) return;
+  try{const novas=lerCSV(await f.text());const ids=new Set(corridas.map(c=>c.id));let n=0;
+    novas.forEach(c=>{if(!ids.has(c.id)){corridas.push(c);ids.add(c.id);n++}});
+    gravar();render();status(n+" corridas importadas"+(novas.length-n?", "+(novas.length-n)+" já existiam":"")+".","ok");
+  }catch(err){status("Esse arquivo não é um CSV desta calculadora.","err")}
+  e.target.value="";
+});
+</script>
+</body>
+</html>
