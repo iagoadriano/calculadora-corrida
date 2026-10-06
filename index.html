@@ -140,7 +140,7 @@ tr:last-child td{border-bottom:0}
       <label for="consumo">Consumo (km/l)<input id="consumo" type="number" inputmode="decimal" step="0.1" value="7.5"></label>
       <label for="preco">Combustível (R$/l)<input id="preco" type="number" inputmode="decimal" step="0.01" value="6.61"></label>
       <label for="meta">Meta mínima (R$/km)<input id="meta" type="number" inputmode="decimal" step="0.1" value="1.50"></label>
-      <label for="taxaMaxim">Taxa Maxim (%)<input id="taxaMaxim" type="number" inputmode="decimal" step="0.5" value="17"></label>
+      <label for="taxaMaxim">Taxa do app (%)<input id="taxaMaxim" type="number" inputmode="decimal" step="0.5" value="17"></label>
     </div>
     <span class="hint">Configuração do carro de <b id="motCarro"></b>. Cada motorista tem a sua. Atualize o preço do litro quando abastecer. Cada corrida registrada guarda o preço do dia.</span>
   </fieldset>
@@ -208,11 +208,12 @@ const DIAS=["dom","seg","ter","qua","qui","sex","sáb"];
 const PREFS=["consumo","preco","meta","taxaMaxim"];
 const MOTORISTAS=["Iago Adriano","Otoniel Monteiro"];
 const PADRAO={consumo:"7.5",preco:"6.61",meta:"1.50",taxaMaxim:"17"};
+const PADRAO_MOT={"Otoniel Monteiro":{taxaMaxim:"12"}};   // padrões próprios de cada motorista
 let cfg={mot:MOTORISTAS[0],filtro:"",carros:{}};
 try{const s=JSON.parse(localStorage.getItem("calc-corrida-v2")||"null");if(s)cfg=Object.assign(cfg,s);
   else{const v1=JSON.parse(localStorage.getItem("calc-corrida")||"null");if(v1)cfg.carros[MOTORISTAS[0]]=v1}}catch(e){}
 cfg.mot="";   // sempre começa sem motorista escolhido
-function carregarCarro(){if(!cfg.mot)return;const c=Object.assign({},PADRAO,cfg.carros[cfg.mot]||{});PREFS.forEach(k=>$(k).value=c[k]);$("motCarro").textContent=cfg.mot}
+function carregarCarro(){if(!cfg.mot)return;const c=Object.assign({},PADRAO,PADRAO_MOT[cfg.mot]||{},cfg.carros[cfg.mot]||{});PREFS.forEach(k=>$(k).value=c[k]);$("motCarro").textContent=cfg.mot}
 function savePrefs(){if(!cfg.mot)return;const o={};PREFS.forEach(k=>o[k]=$(k).value);cfg.carros[cfg.mot]=o;try{localStorage.setItem("calc-corrida-v2",JSON.stringify(cfg))}catch(e){}}
 $("motSel").innerHTML+=MOTORISTAS.map(m=>`<option>${esc(m)}</option>`).join("");
 $("motSel").value="";

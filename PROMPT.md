@@ -13,7 +13,7 @@ Leia esse arquivo e o `README.md` antes de mudar qualquer coisa.
 
 - Dois motoristas usam o sistema: Iago Adriano e Otoniel Monteiro. Cada corrida pertence a um motorista, cada motorista tem a configuração do próprio carro, e os relatórios filtram por motorista ou somam os dois.
 
-- Motorista que roda na Maxim (taxa de 17%, categorias Econômica e Conforto), faz corridas avulsas (sem taxa) e pode usar
+- Iago roda na Maxim com taxa de 17%; Otoniel tem taxa de 12%. Motorista que roda na Maxim (taxa de 17%, categorias Econômica e Conforto), faz corridas avulsas (sem taxa) e pode usar
   Uber, 99 e inDrive.
 - Carro: Hyundai Creta 2.0, média de 7,5 km/l. O preço do litro muda (hoje está em R$ 6,61).
 - Usa principalmente o iPhone (Safari). Tudo precisa funcionar bem em uma tela de 375 a 430 px, com uma mão.
