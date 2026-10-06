@@ -6,7 +6,7 @@ e gera relatórios do **dia**, da **semana** e do **mês**.
 
 Tem dois motoristas cadastrados, **Iago Adriano** e **Otoniel Monteiro**. Cada um tem a configuração do próprio carro, e os relatórios podem ser filtrados por motorista ou mostrar os dois juntos.
 
-Funciona direto no navegador do celular (Safari ou Chrome), sem login e sem servidor.
+Funciona direto no navegador do celular (Safari ou Chrome). Os dados ficam num banco de dados compartilhado, protegido por código de acesso.
 
 ## Como usar
 
@@ -31,12 +31,21 @@ Cada corrida guarda o preço do litro e o consumo do momento em que foi registra
 
 ## Onde os dados ficam e o backup
 
-As corridas ficam salvas **no próprio navegador** (localStorage). Cada pessoa e cada aparelho tem o seu histórico.
-Você perde o histórico se limpar os dados do navegador, usar o modo privado ou trocar de celular. Por isso, faça backup:
+As corridas ficam num **banco de dados no Supabase** (projeto `calculadora-corrida`, servidor em São Paulo), compartilhado entre os
+motoristas. No primeiro acesso, cada celular pede o **código de acesso**. Sem o código, ninguém lê nem grava nada.
+
+- Cada corrida registrada vai direto para o banco. O celular também guarda uma cópia.
+- Sem internet, a corrida fica guardada no celular e é enviada sozinha quando a conexão volta.
+- A estrutura do banco está em [`supabase/schema.sql`](supabase/schema.sql). A tabela não tem acesso direto: o app só usa as funções
+  `listar_corridas`, `salvar_corridas` e `apagar_corrida`, que conferem o código.
+- Para trocar o código, rode no SQL Editor:
+  `update privado.config set codigo_hash = extensions.crypt('NOVO-CODIGO', extensions.gen_salt('bf'));`
+
+O CSV continua servindo de backup:
 
 - **Exportar CSV:** escolha entre o histórico completo ou só o período aberto. No iPhone, o arquivo vai para o app *Arquivos*
   (pasta Downloads). Mova-o para a pasta [`backup/`](backup/).
-- **Importar CSV:** restaura o histórico ou leva as corridas para outro aparelho. As corridas que já existem não são duplicadas
+- **Importar CSV:** envia para o banco as corridas de um arquivo. As corridas que já existem não são duplicadas
   (a comparação é feita pela coluna `id`).
 
 O CSV usa `;` como separador e vírgula decimal, então abre direto no Excel em português e no Google Planilhas.
@@ -70,6 +79,7 @@ calculadora-corrida/
 ├── index.html        app completo (HTML + CSS + JS, sem dependências)
 ├── backup/           onde guardar os CSV exportados
 │   └── corridas-2026-10-05.csv
+├── supabase/schema.sql  estrutura do banco de dados
 ├── PROMPT.md         prompt detalhado para evoluir o projeto com IA
 └── README.md
 ```
