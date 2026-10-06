@@ -80,6 +80,8 @@ tr:last-child td{border-bottom:0}
 .copy{background:transparent;color:var(--fg);border:1px solid var(--line);padding:11px}
 #painel[hidden]{display:none!important}
 #motSel{font-size:19px;padding:13px 10px}
+.linkbtn{background:transparent;color:var(--fg);text-decoration:underline;padding:6px 0;font-weight:500;font-size:14px}
+.userbar{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
 .motpick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .motpick button{background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:12px 8px;font-size:16px}
 .motpick button[aria-checked="true"]{background:var(--ink);color:var(--ink-fg);border-color:var(--ink)}
@@ -94,11 +96,24 @@ tr:last-child td{border-bottom:0}
   </header>
 
   <fieldset class="mot">
-    <legend>Motorista</legend>
-    <form id="acessoBox" class="save" hidden>
-      <label for="codigo">Código de acesso<input id="codigo" type="password" autocomplete="current-password" placeholder="corrida-…" style="font-size:17px"></label>
-      <button class="primary" type="submit" id="entrar">Entrar</button>
-    </form>
+    <legend>Acesso</legend>
+    <div id="loginBox" hidden style="display:grid;gap:12px">
+      <form id="loginForm" style="display:grid;gap:10px">
+        <label for="lgCpf">CPF<input id="lgCpf" type="text" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" maxlength="14" style="font-size:18px"></label>
+        <label for="lgSenha">Senha<input id="lgSenha" type="password" autocomplete="current-password" style="font-size:18px"></label>
+        <button class="primary" type="submit" id="lgEntrar">Entrar</button>
+        <button class="linkbtn" type="button" id="irPrimeiro">Primeiro acesso? Use o seu convite</button>
+      </form>
+      <form id="primeiroForm" hidden style="display:grid;gap:10px">
+        <label for="paConvite">Código de convite<input id="paConvite" type="text" autocomplete="off" autocapitalize="none" placeholder="nome-xxxxxx" style="font-size:18px"></label>
+        <label for="paCpf">Seu CPF<input id="paCpf" type="text" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" maxlength="14" style="font-size:18px"></label>
+        <label for="paSenha">Crie uma senha (mínimo 6)<input id="paSenha" type="password" autocomplete="new-password" style="font-size:18px"></label>
+        <label for="paSenha2">Repita a senha<input id="paSenha2" type="password" autocomplete="new-password" style="font-size:18px"></label>
+        <button class="primary" type="submit" id="paCriar">Criar acesso</button>
+        <button class="linkbtn" type="button" id="irLogin">Já tenho acesso</button>
+      </form>
+    </div>
+    <div id="userBar" hidden class="userbar"><span>Conectado como <b id="userNome"></b></span><button class="linkbtn" type="button" id="sairBtn">Sair</button></div>
     <label for="motSel" id="motLabel">Quem está lançando
       <select id="motSel"><option value="">Selecione o motorista…</option></select>
     </label>
@@ -350,15 +365,19 @@ $("copiar").addEventListener("click",async()=>{
   setTimeout(()=>$("copiar").textContent="Copiar resumo",2000);
 });
 
-/* ---------- banco de dados (Supabase) + cópia no navegador ---------- */
+/* ---------- banco de dados (Supabase) + login + cópia no navegador ---------- */
 const SB_URL="https://znegjbohfmgvkhpftfag.supabase.co";
-const SB_KEY="sb_publishable_pcyRn1nyfW8Ua82tu1UoaQ_QD3eJKBe";   // chave pública; o acesso real exige o código
-const KEY="corridas-v1", KEY_COD="corridas-codigo", KEY_PEND="corridas-pendentes";
-let dbState="on",podeEscrever=true,codigo="",pendentes=[];
+const SB_KEY="sb_publishable_pcyRn1nyfW8Ua82tu1UoaQ_QD3eJKBe";   // chave pública; o acesso real exige login
+const KEY="corridas-v1", KEY_SES="corridas-sessao", KEY_PEND="corridas-pendentes";
+let dbState="on",podeEscrever=true,sessao=null,pendentes=[];
 function status(msg,cls){const s=$("status");s.textContent=msg;s.className="status "+(cls||"")}
 function ler(k,d){try{return JSON.parse(localStorage.getItem(k)||"null")??d}catch(e){return d}}
 function salvarLocal(){try{localStorage.setItem(KEY,JSON.stringify(corridas));localStorage.setItem(KEY_PEND,JSON.stringify(pendentes));return true}catch(e){return false}}
 function syncMsg(t,cls){const e=$("sync");e.textContent=t;e.style.color=cls==="err"?"var(--bad)":cls==="ok"?"var(--good)":""}
+const ERROS={login_invalido:"CPF ou senha incorretos.",bloqueado:"Muitas senhas erradas. Acesso bloqueado por 15 minutos.",
+  muitas_tentativas:"Muitas tentativas. Espere 15 minutos.",cpf_invalido:"CPF inválido. Confira os números.",
+  senha_curta:"A senha precisa ter pelo menos 6 caracteres.",convite_invalido:"Código de convite inválido ou já usado.",
+  cpf_em_uso:"Esse CPF já tem acesso. Use “Já tenho acesso”."};
 
 const paraBanco=c=>({id:c.id,motorista:c.motorista,dia:c.dia,hora:c.hora||"",ts:c.ts,plataforma:c.plataforma,valor:c.valor,
   taxa_pct:c.taxaPct,taxa:c.taxa,outras:c.outras||0,outras_desc:c.outrasDesc||"",km:c.km,minutos:c.minutos||0,
@@ -369,58 +388,85 @@ const doBanco=r=>({id:r.id,motorista:r.motorista,dia:r.dia,hora:r.hora,ts:+r.ts,
 
 async function rpc(fn,args){
   const r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{"apikey":SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(args)});
-  if(!r.ok){const t=await r.text();const e=new Error(t.includes("codigo_invalido")?"codigo":"falha");e.codigo=t.includes("codigo_invalido");throw e}
-  const t=await r.text();return t?JSON.parse(t):null;
+  const t=await r.text();
+  if(!r.ok){const e=new Error("falha");e.sessao=t.includes("sessao_invalida");if(e.sessao)telaLogin("Sua sessão expirou. Entre de novo.");throw e}
+  return t?JSON.parse(t):null;
 }
-function pedirCodigo(msg){
-  codigo="";try{localStorage.removeItem(KEY_COD)}catch(e){}
-  $("acessoBox").hidden=false;$("motLabel").hidden=true;$("motAviso").hidden=true;$("painel").hidden=true;
-  syncMsg(msg||"Digite o código de acesso para usar o banco de dados.",msg?"err":"");
+const mascaraCpf=v=>{const d=v.replace(/\D/g,"").slice(0,11);return d.replace(/^(\d{3})(\d)/,"$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/,"$1.$2.$3").replace(/\.(\d{3})(\d)/,".$1-$2")};
+["lgCpf","paCpf"].forEach(id=>$(id).addEventListener("input",e=>{e.target.value=mascaraCpf(e.target.value)}));
+$("irPrimeiro").addEventListener("click",()=>{$("loginForm").hidden=true;$("primeiroForm").hidden=false;syncMsg("Digite o convite que você recebeu, seu CPF e crie a sua senha.")});
+$("irLogin").addEventListener("click",()=>{$("loginForm").hidden=false;$("primeiroForm").hidden=true;syncMsg("")});
+
+function telaLogin(msg){
+  sessao=null;try{localStorage.removeItem(KEY_SES)}catch(e){}
+  corridas=[];pendentes=[];salvarLocal();cfg.mot="";
+  $("loginBox").hidden=false;$("loginForm").hidden=false;$("primeiroForm").hidden=true;
+  $("userBar").hidden=true;$("motLabel").hidden=true;$("motAviso").hidden=true;$("painel").hidden=true;
+  syncMsg(msg||"Entre com o seu CPF e senha.",msg?"err":"");
 }
+function abrirSessao(){
+  $("loginBox").hidden=true;$("userBar").hidden=false;$("userNome").textContent=sessao.nome+(sessao.admin?" (administrador)":"");
+  $("filtroMot").closest("label").hidden=!sessao.admin;
+  if(sessao.admin){$("motLabel").hidden=false;$("motSel").value=sessao.nome}
+  else{$("motLabel").hidden=true;$("motSel").value=sessao.nome}
+  $("motSel").dispatchEvent(new Event("change"));
+  if(!sessao.admin){$("filtroMot").value=sessao.nome}
+}
+async function aposLogin(res){
+  if(!res||!res.ok){syncMsg(ERROS[res&&res.erro]||"Não foi possível entrar.","err");return}
+  sessao={token:res.token,nome:res.nome,admin:!!res.admin};
+  try{localStorage.setItem(KEY_SES,JSON.stringify(sessao))}catch(e){}
+  ["lgCpf","lgSenha","paConvite","paCpf","paSenha","paSenha2"].forEach(id=>$(id).value="");
+  corridas=[];pendentes=[];abrirSessao();await sincronizar();
+}
+$("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();$("lgEntrar").disabled=true;syncMsg("Entrando…");
+  try{await aposLogin(await rpc("entrar",{p_cpf:$("lgCpf").value,p_senha:$("lgSenha").value}))}
+  catch(err){syncMsg("Sem conexão. Tente de novo quando tiver internet.","err")}
+  finally{$("lgEntrar").disabled=false}
+});
+$("primeiroForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if($("paSenha").value!==$("paSenha2").value){syncMsg("As duas senhas não são iguais.","err");return}
+  $("paCriar").disabled=true;syncMsg("Criando o acesso…");
+  try{await aposLogin(await rpc("primeiro_acesso",{p_convite:$("paConvite").value.trim().toLowerCase(),p_cpf:$("paCpf").value,p_senha:$("paSenha").value}))}
+  catch(err){syncMsg("Sem conexão. Tente de novo quando tiver internet.","err")}
+  finally{$("paCriar").disabled=false}
+});
+$("sairBtn").addEventListener("click",async()=>{
+  if(pendentes.length){syncMsg("Há "+pendentes.length+" corrida(s) ainda não enviada(s). Conecte à internet antes de sair.","err");return}
+  try{await rpc("sair",{p_token:sessao.token})}catch(e){}
+  telaLogin();
+});
+
 async function enviarPendentes(){
-  if(!codigo||!pendentes.length) return;
-  try{
-    const lista=corridas.filter(c=>pendentes.includes(c.id)).map(paraBanco);
-    for(let i=0;i<lista.length;i+=200) await rpc("salvar_corridas",{p_codigo:codigo,p_corridas:lista.slice(i,i+200)});
-    pendentes=[];salvarLocal();
-  }catch(e){if(e.codigo)pedirCodigo("Código de acesso inválido.");throw e}
+  if(!sessao||!pendentes.length) return;
+  const lista=corridas.filter(c=>pendentes.includes(c.id)).map(paraBanco);
+  for(let i=0;i<lista.length;i+=200) await rpc("salvar_corridas",{p_token:sessao.token,p_corridas:lista.slice(i,i+200)});
+  pendentes=[];salvarLocal();
 }
 async function sincronizar(){
-  if(!codigo) return;
+  if(!sessao) return;
   syncMsg("Sincronizando com o banco…");
   try{
     await enviarPendentes();
-    const rows=await rpc("listar_corridas",{p_codigo:codigo});
+    const rows=await rpc("listar_corridas",{p_token:sessao.token});
     corridas=rows.map(doBanco);salvarLocal();render();
-    syncMsg("✓ Banco de dados conectado · "+corridas.length+" corridas salvas","ok");
-    return true;
+    syncMsg("✓ Banco de dados conectado · "+corridas.length+" corridas","ok");
   }catch(e){
-    if(e.codigo) return false;
+    if(e.sessao) return;
     syncMsg("Sem conexão com o banco. "+(pendentes.length?pendentes.length+" corrida(s) guardada(s) no celular, envio quando a internet voltar.":"Mostrando a última cópia do celular."),"err");
-    return true;
   }
 }
-$("acessoBox").addEventListener("submit",async e=>{
-  e.preventDefault();
-  const c=$("codigo").value.trim();if(!c) return;
-  $("entrar").disabled=true;syncMsg("Conferindo o código…");
-  try{await rpc("listar_corridas",{p_codigo:c,p_desde:"2999-01-01"});
-    codigo=c;try{localStorage.setItem(KEY_COD,c)}catch(err){}
-    $("acessoBox").hidden=true;$("motLabel").hidden=false;$("motAviso").hidden=!!cfg.mot;$("codigo").value="";
-    await sincronizar();
-  }catch(err){syncMsg(err.codigo?"Código de acesso inválido.":"Sem conexão. Tente de novo quando tiver internet.","err")}
-  finally{$("entrar").disabled=false}
-});
 
-corridas=ler(KEY,[]);pendentes=ler(KEY_PEND,[]);codigo=ler(KEY_COD,"")||"";
-if(typeof codigo!=="string")codigo="";
-try{codigo=localStorage.getItem(KEY_COD)||""}catch(e){}
+corridas=ler(KEY,[]);pendentes=ler(KEY_PEND,[]);sessao=ler(KEY_SES,null);
 render();
-if(codigo){sincronizar()}else{pedirCodigo()}
+if(sessao&&sessao.token){abrirSessao();sincronizar()}else{telaLogin()}
 window.addEventListener("online",()=>sincronizar());
 
 $("registrar").addEventListener("click",async()=>{
   const c=corridaAtual();
+  if(!sessao){status("Entre com o seu CPF e senha primeiro.","err");return}
   if(!cfg.mot){status("Escolha o motorista primeiro.","err");return}
   if(c.valor<=0){status("Coloque o valor da corrida antes de registrar.","err");return}
   const agora=new Date();
@@ -434,8 +480,8 @@ $("registrar").addEventListener("click",async()=>{
   modo="dia";ref=new Date();document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.mode==="dia"));
   render();
   $("registrar").disabled=true;status("Salvando…");
-  try{await enviarPendentes();status("Corrida de "+brl(doc.valor)+" salva no banco para "+cfg.mot+".","ok");syncMsg("✓ Banco de dados conectado · "+corridas.length+" corridas salvas","ok")}
-  catch(e){if(!e.codigo)status("Sem internet: corrida guardada no celular. Envio automático quando a conexão voltar.","err")}
+  try{await enviarPendentes();status("Corrida de "+brl(doc.valor)+" salva no banco para "+cfg.mot+".","ok");syncMsg("✓ Banco de dados conectado · "+corridas.length+" corridas","ok")}
+  catch(e){if(!e.sessao)status("Sem internet: corrida guardada no celular. Envio automático quando a conexão voltar.","err")}
   finally{$("registrar").disabled=false}
 });
 
@@ -445,9 +491,9 @@ $("rTable").addEventListener("click",async e=>{
   const id=b.dataset.id;
   try{
     if(pendentes.includes(id)){pendentes=pendentes.filter(x=>x!==id)}
-    else{await rpc("apagar_corrida",{p_codigo:codigo,p_id:id})}
+    else{await rpc("apagar_corrida",{p_token:sessao.token,p_id:id})}
     corridas=corridas.filter(c=>c.id!==id);salvarLocal();status("Corrida apagada.","ok");render();
-  }catch(err){if(err.codigo)pedirCodigo("Código de acesso inválido.");else status("Sem conexão: não consegui apagar no banco. Tente de novo.","err")}
+  }catch(err){if(!err.sessao)status("Sem conexão: não consegui apagar no banco. Tente de novo.","err")}
 });
 
 /* CSV: separador ";" e vírgula decimal, abre certo no Excel em português */
@@ -483,10 +529,10 @@ $("importar").addEventListener("change",async e=>{
   let novas;
   try{novas=lerCSV(await f.text())}catch(err){status("Esse arquivo não é um CSV desta calculadora.","err");e.target.value="";return}
   const ids=new Set(corridas.map(c=>c.id));let n=0;
-  novas.forEach(c=>{if(!ids.has(c.id)&&MOTORISTAS.includes(c.motorista)){corridas.push(c);pendentes.push(c.id);ids.add(c.id);n++}});
+  novas.forEach(c=>{if(!ids.has(c.id)&&MOTORISTAS.includes(c.motorista)&&(sessao&&(sessao.admin||c.motorista===sessao.nome))){corridas.push(c);pendentes.push(c.id);ids.add(c.id);n++}});
   salvarLocal();render();
   try{await enviarPendentes();status(n+" corridas importadas para o banco"+(novas.length-n?", "+(novas.length-n)+" já existiam":"")+".","ok")}
-  catch(err){if(!err.codigo)status(n+" corridas importadas no celular. Envio ao banco quando a conexão voltar.","err")}
+  catch(err){if(!err.sessao)status(n+" corridas importadas no celular. Envio ao banco quando a conexão voltar.","err")}
   e.target.value="";
 });
 </script>
