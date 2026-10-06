@@ -11,6 +11,8 @@ Leia esse arquivo e o `README.md` antes de mudar qualquer coisa.
 
 ## Contexto do usuário
 
+- Dois motoristas usam o sistema: Iago Adriano e Otoniel Monteiro. Cada corrida pertence a um motorista, cada motorista tem a configuração do próprio carro, e os relatórios filtram por motorista ou somam os dois.
+
 - Motorista que roda na Maxim (taxa de 17%, categorias Econômica e Conforto), faz corridas avulsas (sem taxa) e pode usar
   Uber, 99 e inDrive.
 - Carro: Hyundai Creta 2.0, média de 7,5 km/l. O preço do litro muda (hoje está em R$ 6,61).
@@ -34,7 +36,7 @@ R$/hora     = soma(liquido) ÷ soma(minutos) × 60          (só corridas com mi
 ## Formato do CSV (compatibilidade obrigatória)
 
 Separador `;`, vírgula decimal, UTF-8 com BOM, cabeçalho nesta ordem:
-`id;data;hora;origem;valor;taxa_pct;taxa_app;outras_taxas;outras_desc;km;minutos;preco_litro;consumo_km_l;combustivel;liquido;timestamp`
+`id;data;hora;motorista;origem;valor;taxa_pct;taxa_app;outras_taxas;outras_desc;km;minutos;preco_litro;consumo_km_l;combustivel;liquido;timestamp`
 
 A importação precisa aceitar arquivos antigos e mesclar pelo `id`, sem duplicar.
 

@@ -77,6 +77,9 @@ tr:last-child td{border-bottom:0}
 .tag{font-size:12px;color:var(--muted);display:block}
 .empty{color:var(--muted);font-size:14px;text-align:center;padding:10px 0}
 .copy{background:transparent;color:var(--fg);border:1px solid var(--line);padding:11px}
+.motpick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.motpick button{background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:12px 8px;font-size:16px}
+.motpick button[aria-checked="true"]{background:var(--ink);color:var(--ink-fg);border-color:var(--ink)}
 @media (max-width:360px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -86,6 +89,11 @@ tr:last-child td{border-bottom:0}
     <h1>Calculadora de Corrida</h1>
     <p class="sub">Quanto sobra no bolso depois da taxa e do combustível</p>
   </header>
+
+  <fieldset class="mot">
+    <legend>Motorista</legend>
+    <div class="motpick" role="radiogroup" aria-label="Motorista do lançamento" id="motPick"></div>
+  </fieldset>
 
   <section class="result" aria-live="polite">
     <span class="lbl">Você recebe de fato</span>
@@ -127,11 +135,14 @@ tr:last-child td{border-bottom:0}
       <label for="meta">Meta mínima (R$/km)<input id="meta" type="number" inputmode="decimal" step="0.1" value="1.50"></label>
       <label for="taxaMaxim">Taxa Maxim (%)<input id="taxaMaxim" type="number" inputmode="decimal" step="0.5" value="17"></label>
     </div>
-    <span class="hint">Creta 2.0, média de 7,5 km/l. Atualize o preço do litro quando abastecer. Cada corrida registrada guarda o preço do dia.</span>
+    <span class="hint">Configuração do carro de <b id="motCarro"></b>. Cada motorista tem a sua. Atualize o preço do litro quando abastecer. Cada corrida registrada guarda o preço do dia.</span>
   </fieldset>
 
   <section style="display:grid;gap:12px" aria-labelledby="relTitulo">
     <h2 id="relTitulo">Relatório</h2>
+    <label for="filtroMot">Motorista no relatório
+      <select id="filtroMot"><option value="">Todos os motoristas</option></select>
+    </label>
     <div class="tabs" role="tablist">
       <button type="button" role="tab" data-mode="dia" aria-selected="true">Dia</button>
       <button type="button" role="tab" data-mode="semana" aria-selected="false">Semana</button>
@@ -187,8 +198,24 @@ const DIAS=["dom","seg","ter","qua","qui","sex","sáb"];
 
 /* ---------- preferências do aparelho ---------- */
 const PREFS=["consumo","preco","meta","taxaMaxim"];
-try{const s=JSON.parse(localStorage.getItem("calc-corrida")||"{}");PREFS.forEach(k=>{if(s[k]!=null&&s[k]!=="")$(k).value=s[k]})}catch(e){}
-function savePrefs(){try{const o={};PREFS.forEach(k=>o[k]=$(k).value);localStorage.setItem("calc-corrida",JSON.stringify(o))}catch(e){}}
+const MOTORISTAS=["Iago Adriano","Otoniel Monteiro"];
+const PADRAO={consumo:"7.5",preco:"6.61",meta:"1.50",taxaMaxim:"17"};
+let cfg={mot:MOTORISTAS[0],filtro:"",carros:{}};
+try{const s=JSON.parse(localStorage.getItem("calc-corrida-v2")||"null");if(s)cfg=Object.assign(cfg,s);
+  else{const v1=JSON.parse(localStorage.getItem("calc-corrida")||"null");if(v1)cfg.carros[MOTORISTAS[0]]=v1}}catch(e){}
+if(!MOTORISTAS.includes(cfg.mot))cfg.mot=MOTORISTAS[0];
+function carregarCarro(){const c=Object.assign({},PADRAO,cfg.carros[cfg.mot]||{});PREFS.forEach(k=>$(k).value=c[k]);$("motCarro").textContent=cfg.mot}
+function savePrefs(){const o={};PREFS.forEach(k=>o[k]=$(k).value);cfg.carros[cfg.mot]=o;try{localStorage.setItem("calc-corrida-v2",JSON.stringify(cfg))}catch(e){}}
+function desenharMotoristas(){
+  $("motPick").innerHTML=MOTORISTAS.map(m=>`<button type="button" role="radio" aria-checked="${m===cfg.mot}" data-mot="${esc(m)}">${esc(m)}</button>`).join("");
+}
+$("motPick").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;cfg.mot=b.dataset.mot;desenharMotoristas();carregarCarro();
+  if($("plataforma").value==="Maxim")$("taxa").value=$("taxaMaxim").value;calc()});
+$("filtroMot").innerHTML+=MOTORISTAS.map(m=>`<option>${esc(m)}</option>`).join("");
+$("filtroMot").value=MOTORISTAS.includes(cfg.filtro)?cfg.filtro:"";
+$("filtroMot").addEventListener("change",()=>{cfg.filtro=$("filtroMot").value;savePrefs();render()});
+desenharMotoristas();carregarCarro();
+$("taxa").value=$("taxaMaxim").value;
 
 /* ---------- calculadora ---------- */
 function corridaAtual(){
@@ -240,7 +267,8 @@ function soma(lista){
 }
 function noPeriodo(){
   const {ini,fim}=intervalo();const a=ymd(ini),b=ymd(new Date(fim-864e5));
-  return corridas.filter(c=>c.dia>=a&&c.dia<=b).sort((x,y)=>x.ts-y.ts);
+  const f=$("filtroMot").value;
+  return corridas.filter(c=>c.dia>=a&&c.dia<=b&&(!f||(c.motorista||MOTORISTAS[0])===f)).sort((x,y)=>x.ts-y.ts);
 }
 function render(){
   $("periodo").textContent=rotulo();
@@ -261,16 +289,24 @@ function render(){
   if(!lista.length){box.innerHTML=`<p class="empty">${dbState==="off"?"Este navegador está bloqueando o armazenamento. Saia do modo privado.":"Nenhuma corrida registrada neste período."}</p>`;return}
   if(modo==="dia"){
     box.innerHTML=`<table><tr><th>Corrida</th><th class="n">Valor</th><th class="n">Líquido</th><th class="n">R$/km</th><th></th></tr>`+
-      lista.map(c=>`<tr><td>${c.hora||"—"}<span class="tag">${c.plataforma} · ${n1(c.km)} km${c.outras?` · ${esc(c.outrasDesc||"outras")} ${brl(c.outras)}`:""}</span></td><td class="n">${brl(c.valor)}</td><td class="n ${c.liquido>=0?"pos":"neg"}">${brl(c.liquido)}</td><td class="n">${c.km>0?brl(c.liquido/c.km):"—"}</td><td class="n">${podeEscrever?`<button class="del" data-id="${c.id}" type="button" aria-label="Apagar corrida">✕</button>`:""}</td></tr>`).join("")+`</table>`;
+      lista.map(c=>`<tr><td>${c.hora||"—"}<span class="tag">${$("filtroMot").value?"":esc((c.motorista||MOTORISTAS[0]).split(" ")[0])+" · "}${c.plataforma} · ${n1(c.km)} km${c.outras?` · ${esc(c.outrasDesc||"outras")} ${brl(c.outras)}`:""}</span></td><td class="n">${brl(c.valor)}</td><td class="n ${c.liquido>=0?"pos":"neg"}">${brl(c.liquido)}</td><td class="n">${c.km>0?brl(c.liquido/c.km):"—"}</td><td class="n">${podeEscrever?`<button class="del" data-id="${c.id}" type="button" aria-label="Apagar corrida">✕</button>`:""}</td></tr>`).join("")+`</table>`;
   }else{
     const porDia={};lista.forEach(c=>(porDia[c.dia]=porDia[c.dia]||[]).push(c));
+    const porMot={};lista.forEach(c=>{const m=c.motorista||MOTORISTAS[0];(porMot[m]=porMot[m]||[]).push(c)});
     const porOrigem={};lista.forEach(c=>(porOrigem[c.plataforma]=porOrigem[c.plataforma]||[]).push(c));
     box.innerHTML=`<table><tr><th>Dia</th><th class="n">Corridas</th><th class="n">Faturado</th><th class="n">Líquido</th></tr>`+
       Object.keys(porDia).sort().map(d=>{const s=soma(porDia[d]);const dt=new Date(d+"T12:00");return `<tr><td>${DIAS[dt.getDay()]} ${pad(dt.getDate())}/${pad(dt.getMonth()+1)}</td><td class="n">${s.n}</td><td class="n">${brl(s.valor)}</td><td class="n ${s.liquido>=0?"pos":"neg"}">${brl(s.liquido)}</td></tr>`}).join("")+`</table>`+
       `<table style="margin-top:12px"><tr><th>Origem</th><th class="n">Corridas</th><th class="n">Líquido</th><th class="n">R$/km</th></tr>`+
-      Object.keys(porOrigem).map(o=>{const s=soma(porOrigem[o]);return `<tr><td>${o}</td><td class="n">${s.n}</td><td class="n">${brl(s.liquido)}</td><td class="n">${s.km>0?brl(s.liquido/s.km):"—"}</td></tr>`}).join("")+`</table>`;
+      Object.keys(porOrigem).map(o=>{const s=soma(porOrigem[o]);return `<tr><td>${o}</td><td class="n">${s.n}</td><td class="n">${brl(s.liquido)}</td><td class="n">${s.km>0?brl(s.liquido/s.km):"—"}</td></tr>`}).join("")+`</table>`+
+      ($("filtroMot").value?"":tabelaMot(porMot));
   }
+  if(modo==="dia"&&!$("filtroMot").value){const porMot={};lista.forEach(c=>{const m=c.motorista||MOTORISTAS[0];(porMot[m]=porMot[m]||[]).push(c)});box.innerHTML+=tabelaMot(porMot)}
 }
+function tabelaMot(porMot){
+  return `<table style="margin-top:12px"><tr><th>Motorista</th><th class="n">Corridas</th><th class="n">Faturado</th><th class="n">Líquido</th></tr>`+
+    Object.keys(porMot).sort().map(m=>{const s=soma(porMot[m]);return `<tr><td>${esc(m)}</td><td class="n">${s.n}</td><td class="n">${brl(s.valor)}</td><td class="n ${s.liquido>=0?"pos":"neg"}">${brl(s.liquido)}</td></tr>`}).join("")+`</table>`;
+}
+
 document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{
   modo=b.dataset.mode;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));render();
 }));
@@ -285,7 +321,7 @@ $("next").addEventListener("click",()=>mover(1));
 
 $("copiar").addEventListener("click",async()=>{
   const lista=noPeriodo(),t=soma(lista);
-  const txt=[`Relatório ${modo==="mes"?"do mês":modo==="semana"?"da semana":"do dia"}: ${rotulo()}`,
+  const txt=[`Relatório ${modo==="mes"?"do mês":modo==="semana"?"da semana":"do dia"}: ${rotulo()}`,`Motorista: ${$("filtroMot").value||"todos"}`,
     `Corridas: ${t.n}`,`Faturado: ${brl(t.valor)}`,`Taxa do app: ${brl(t.taxa)}`,`Outras taxas: ${brl(t.outras)}`,`Combustível: ${brl(t.combustivel)}`,
     `Líquido: ${brl(t.liquido)}`,`Km rodados: ${n1(t.km)}`,`R$/km: ${t.km>0?brl(t.liquido/t.km):"—"}`].join("\n");
   try{await navigator.clipboard.writeText(txt);$("copiar").textContent="Resumo copiado"}
@@ -306,13 +342,13 @@ $("registrar").addEventListener("click",()=>{
   if(c.valor<=0){status("Coloque o valor da corrida antes de registrar.","err");return}
   const agora=new Date();
   const doc={id:"c"+agora.getTime().toString(36)+Math.random().toString(36).slice(2,6),ts:agora.getTime(),dia:ymd(agora),
-    hora:pad(agora.getHours())+":"+pad(agora.getMinutes()),plataforma:$("plataforma").value,valor:+c.valor.toFixed(2),
+    hora:pad(agora.getHours())+":"+pad(agora.getMinutes()),motorista:cfg.mot,plataforma:$("plataforma").value,valor:+c.valor.toFixed(2),
     taxaPct:c.taxaPct,taxa:+c.taxa.toFixed(2),km:+c.km.toFixed(1),minutos:c.minutos,precoLitro:c.preco,consumo:c.consumo,
     combustivel:+c.combustivel.toFixed(2),outras:+c.outras.toFixed(2),outrasDesc:$("outrasDesc").value.trim().slice(0,60),
     liquido:+c.liquido.toFixed(2)};
   corridas.push(doc);
   if(gravar()){
-    status("Corrida de "+brl(doc.valor)+" registrada.","ok");
+    status("Corrida de "+brl(doc.valor)+" registrada para "+cfg.mot+".","ok");
     $("outras").value=0;$("outrasDesc").value="";calc();
     modo="dia";ref=new Date();document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.mode==="dia"));
   }
@@ -326,7 +362,7 @@ $("rTable").addEventListener("click",e=>{
 });
 
 /* CSV: separador ";" e vírgula decimal, abre certo no Excel em português */
-const COLS=[["id","id"],["data","dia"],["hora","hora"],["origem","plataforma"],["valor","valor"],["taxa_pct","taxaPct"],["taxa_app","taxa"],
+const COLS=[["id","id"],["data","dia"],["hora","hora"],["motorista","motorista"],["origem","plataforma"],["valor","valor"],["taxa_pct","taxaPct"],["taxa_app","taxa"],
   ["outras_taxas","outras"],["outras_desc","outrasDesc"],["km","km"],["minutos","minutos"],["preco_litro","precoLitro"],
   ["consumo_km_l","consumo"],["combustivel","combustivel"],["liquido","liquido"],["timestamp","ts"]];
 const NUM=new Set(["valor","taxaPct","taxa","outras","km","minutos","precoLitro","consumo","combustivel","liquido","ts"]);
@@ -341,12 +377,12 @@ function lerCSV(txt){
   const cab=linhas.shift()||[];const idx=Object.fromEntries(COLS.map(([n,k])=>[k,cab.indexOf(n)]));
   if(idx.dia<0||idx.valor<0) throw new Error("formato");
   return linhas.map(r=>{const o={};COLS.forEach(([,k])=>{const v=idx[k]>=0?r[idx[k]]:"";o[k]=NUM.has(k)?(parseFloat(String(v).replace(",","."))||0):(v||"")});
-    if(!o.ts)o.ts=new Date(o.dia+"T"+(o.hora||"12:00")).getTime();if(!o.id)o.id="c"+o.ts.toString(36)+Math.random().toString(36).slice(2,6);return o});
+    if(!o.motorista)o.motorista=MOTORISTAS[0];if(!o.ts)o.ts=new Date(o.dia+"T"+(o.hora||"12:00")).getTime();if(!o.id)o.id="c"+o.ts.toString(36)+Math.random().toString(36).slice(2,6);return o});
 }
 $("exportar").addEventListener("click",()=>{
   const lista=modoExport()==="tudo"?corridas.slice().sort((a,b)=>a.ts-b.ts):noPeriodo();
   if(!lista.length){status("Não há corridas para exportar.","err");return}
-  const nome="corridas-"+(modoExport()==="tudo"?"completo-"+ymd(new Date()):rotulo().replace(/[^0-9a-zà-ú]+/gi,"-"))+".csv";
+  const nome="corridas-"+($("filtroMot").value&&modoExport()!=="tudo"?$("filtroMot").value.split(" ")[0].toLowerCase()+"-":"")+(modoExport()==="tudo"?"completo-"+ymd(new Date()):rotulo().replace(/[^0-9a-zà-ú]+/gi,"-"))+".csv";
   const url=URL.createObjectURL(new Blob([paraCSV(lista)],{type:"text/csv;charset=utf-8"}));
   const a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),2000);

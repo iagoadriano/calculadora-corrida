@@ -4,13 +4,15 @@ Calculadora de ganho líquido para motorista de aplicativo (Maxim, Uber, 99, inD
 Desconta a taxa do app, o combustível e outras taxas (pedágio, estacionamento, lavagem…), registra cada corrida
 e gera relatórios do **dia**, da **semana** e do **mês**.
 
+Tem dois motoristas cadastrados, **Iago Adriano** e **Otoniel Monteiro**. Cada um tem a configuração do próprio carro, e os relatórios podem ser filtrados por motorista ou mostrar os dois juntos.
+
 Funciona direto no navegador do celular (Safari ou Chrome), sem login e sem servidor.
 
 ## Como usar
 
 1. Abra o `index.html` no navegador, ou o link do GitHub Pages (veja abaixo).
 2. Em **Carro**, configure o consumo (km/l), o preço do litro, a taxa da Maxim e a sua meta mínima de R$/km.
-3. Para cada corrida, escolha a origem, preencha o valor, os km (até o passageiro + da corrida), o tempo e as outras taxas, se houver.
+3. No topo, toque no nome do motorista. Para cada corrida, escolha a origem, preencha o valor, os km (até o passageiro + da corrida), o tempo e as outras taxas, se houver.
    Toque em **Registrar corrida**.
 4. Em **Relatório**, alterne entre Dia / Semana / Mês e use as setas ‹ › para mudar o período.
    **Copiar resumo** copia o texto do relatório para você colar no WhatsApp.
@@ -44,6 +46,7 @@ A pasta `backup/` tem um exemplo: `corridas-2026-10-05.csv`.
 |---|---|
 | id | identificador único da corrida |
 | data / hora | quando foi registrada |
+| motorista | Iago Adriano ou Otoniel Monteiro |
 | origem | Maxim, Avulsa, Uber, 99, inDrive |
 | valor | valor pago pela corrida (R$) |
 | taxa_pct / taxa_app | taxa do aplicativo (% e R$) |
